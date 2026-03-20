@@ -55,9 +55,7 @@
   </div>
 
   <script type="module">
-    import {
-      cmdLook, cmdTake, cmdDrop, cmdInventory, cmdExits, cmdHelp
-    } from './engine.js';
+    import COMMANDS, { output } from './commands.js';
 
     const term  = document.getElementById('term');
     const input = document.getElementById('cmd');
@@ -65,7 +63,27 @@
     const history = [];
     let histIndex = -1;
 
-    // ---------------------------------------------------------------- Output helpers
+    // ---------------------------------------------------------------- Resolve a typed command
+    function dispatch(raw) {
+      const [word, ...rest] = raw.trim().toLowerCase().split(/\s+/);
+      const args = rest.join(' ') || null;
+
+      // clear is handled here so it can wipe the DOM directly
+      if (word === 'clear') { term.innerHTML = ''; return; }
+
+      const cmd = COMMANDS.find(c => {
+        const triggers = Array.isArray(c.trigger) ? c.trigger : [c.trigger];
+        return triggers.includes(word);
+      });
+
+      if (cmd) {
+        cmd.fn(term, args);
+      } else {
+        output(term, `Unknown command: ${word}`, '#555');
+      }
+    }
+
+    // ---------------------------------------------------------------- Echo input
     function printEcho(val) {
       const div = document.createElement('div');
       div.className = 'line';
@@ -78,18 +96,19 @@
 
     // ---------------------------------------------------------------- Boot
     input.focus();
-    cmdLook(term, null);
+    dispatch('look');
 
     document.addEventListener('click', e => {
       if (e.target !== input) input.focus();
     });
 
-    // ---------------------------------------------------------------- Input
+    // ---------------------------------------------------------------- Input resize
     input.addEventListener('input', () => {
       input.style.height = 'auto';
       input.style.height = input.scrollHeight + 'px';
     });
 
+    // ---------------------------------------------------------------- Key handling
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter' && e.shiftKey) return;
 
@@ -100,32 +119,10 @@
         input.style.height = 'auto';
         histIndex = -1;
 
-        if (val.trim() === 'clear') { term.innerHTML = ''; return; }
         if (!val.trim()) return;
-
         history.unshift(val);
         printEcho(val);
-
-        const [cmd, ...rest] = val.trim().toLowerCase().split(/\s+/);
-        const args = rest.join(' ') || null;
-
-        switch (cmd) {
-          case 'look':                cmdLook(term, args);      break;
-          case 'take':                cmdTake(term, args);      break;
-          case 'drop':                cmdDrop(term, args);      break;
-          case 'inv':
-          case 'inventory':           cmdInventory(term);       break;
-          case 'exits':
-          case 'exit':                cmdExits(term);           break;
-          case 'help':                cmdHelp(term);            break;
-          default:
-            const d = document.createElement('div');
-            d.className = 'line';
-            d.style.color = '#555';
-            d.textContent = `Unknown command: ${cmd}`;
-            term.appendChild(d);
-            term.scrollTop = term.scrollHeight;
-        }
+        dispatch(val);
         return;
       }
 
