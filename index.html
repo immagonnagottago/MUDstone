@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Terminal</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0a;
+      font-family: monospace;
+      font-size: 15px;
+      color: #e8e8e8;
+      display: flex;
+      flex-direction: column;
+    }
+    #term {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .line { white-space: pre-wrap; }
+    .input-row {
+      display: flex;
+      padding: 8px 16px;
+      flex-shrink: 0;
+      align-items: flex-start;
+    }
+    .prompt { margin-right: 6px; padding-top: 2px; }
+    #cmd {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #e8e8e8;
+      font-family: monospace;
+      font-size: 15px;
+      flex: 1;
+      caret-color: #e8e8e8;
+      resize: none;
+      overflow: hidden;
+      line-height: 1.5;
+      min-height: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div id="term"></div>
+  <div class="input-row">
+    <span class="prompt">&gt;</span>
+    <textarea id="cmd" rows="1" autocomplete="off" spellcheck="false"
+      placeholder='type "help" for a basic command list'></textarea>
+  </div>
+
+  <script type="module">
+    import {
+      cmdLook, cmdTake, cmdDrop, cmdInventory, cmdExits, cmdHelp
+    } from './engine.js';
+
+    const term  = document.getElementById('term');
+    const input = document.getElementById('cmd');
+
+    const history = [];
+    let histIndex = -1;
+
+    // ---------------------------------------------------------------- Output helpers
+    function printEcho(val) {
+      const div = document.createElement('div');
+      div.className = 'line';
+      div.style.color = '#555';
+      const lines = val.split('\n');
+      div.textContent = '> ' + lines[0] + lines.slice(1).map(l => '\n  ' + l).join('');
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // ---------------------------------------------------------------- Boot
+    input.focus();
+    cmdLook(term, null);
+
+    document.addEventListener('click', e => {
+      if (e.target !== input) input.focus();
+    });
+
+    // ---------------------------------------------------------------- Input
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = input.scrollHeight + 'px';
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.shiftKey) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = input.value;
+        input.value = '';
+        input.style.height = 'auto';
+        histIndex = -1;
+
+        if (val.trim() === 'clear') { term.innerHTML = ''; return; }
+        if (!val.trim()) return;
+
+        history.unshift(val);
+        printEcho(val);
+
+        const [cmd, ...rest] = val.trim().toLowerCase().split(/\s+/);
+        const args = rest.join(' ') || null;
+
+        switch (cmd) {
+          case 'look':                cmdLook(term, args);      break;
+          case 'take':                cmdTake(term, args);      break;
+          case 'drop':                cmdDrop(term, args);      break;
+          case 'inv':
+          case 'inventory':           cmdInventory(term);       break;
+          case 'exits':
+          case 'exit':                cmdExits(term);           break;
+          case 'help':                cmdHelp(term);            break;
+          default:
+            const d = document.createElement('div');
+            d.className = 'line';
+            d.style.color = '#555';
+            d.textContent = `Unknown command: ${cmd}`;
+            term.appendChild(d);
+            term.scrollTop = term.scrollHeight;
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (histIndex < history.length - 1) {
+          histIndex++;
+          input.value = history[histIndex];
+          input.style.height = 'auto';
+          input.style.height = input.scrollHeight + 'px';
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (histIndex > 0) {
+          histIndex--;
+          input.value = history[histIndex];
+        } else {
+          histIndex = -1;
+          input.value = '';
+        }
+        input.style.height = 'auto';
+        input.style.height = input.scrollHeight + 'px';
+        return;
+      }
+    });
+  </script>
+</body>
+</html>
